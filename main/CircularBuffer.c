@@ -7,7 +7,7 @@ static const char *TAG = "CBUFFER";
  * @brief Creates a new CircularBuffer_t object.
  * @return A pointer to the newly created CircularBuffer_t object.
  */
-CircularBuffer_t* createCircularBuffer() 
+CircularBuffer_t* createCircularBuffer(uint8_t size) 
 {
     CircularBuffer_t *buffer = (CircularBuffer_t*)malloc(sizeof(CircularBuffer_t));
     if (buffer == NULL) {
@@ -15,7 +15,7 @@ CircularBuffer_t* createCircularBuffer()
         exit(EXIT_FAILURE);
     }
 
-    buffer->data = (int*)malloc(BUFFER_SIZE * sizeof(int));
+    buffer->data = (int*)malloc(size * sizeof(uint8_t));
     if (buffer->data == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         exit(EXIT_FAILURE);
@@ -45,14 +45,14 @@ void destroyCircularBuffer(CircularBuffer_t *buffer) {
 void enqueue(CircularBuffer_t *buffer, int value) {
     if (buffer->size == BUFFER_SIZE) 
     {
-        ESP_LOGE(TAG, "Buffer overflow\n");
+        ESP_LOGD(TAG, "Buffer is currently full\n");
         return;
     }
 
     buffer->data[buffer->head] = value;
     buffer->head = (buffer->head + 1) % BUFFER_SIZE;
     buffer->size++;
-    ESP_LOGI(TAG, "Enqueued %d", value);
+    ESP_LOGD(TAG, "Enqueued %d", value);
 }
 
 /**
@@ -64,20 +64,20 @@ bool dequeue(CircularBuffer_t *buffer, int *value)
 {
     if (buffer->size == 0) 
     {
-        ESP_LOGE(TAG, "Buffer underflow\n");
+        ESP_LOGD(TAG, "Buffer underflow\n");
         return false;
     }
 
     *value = buffer->data[buffer->tail];
     buffer->tail = (buffer->tail + 1) % BUFFER_SIZE;
     buffer->size--;
-    ESP_LOGI(TAG, "\nDequeued %d", *value);
+    ESP_LOGD(TAG, "Dequeued %d", *value);
     return true;
 }
 
 
 int sample_app() {
-    CircularBuffer_t *buffer = createCircularBuffer();
+    CircularBuffer_t *buffer = createCircularBuffer(100);
 
     // Example usage
     for (int i = 0; i < 110; ++i) {

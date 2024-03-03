@@ -35,7 +35,8 @@ static const char *TAG = "FizzBuzz";
 #define BUF_SIZE (1024)
 
 // Timer handle
-static esp_timer_handle_t timer;
+static esp_timer_handle_t Timer;
+
 
 
 void EvenFooTask(void *pvParameters) 
@@ -93,18 +94,20 @@ bool isPrime(int number) {
 void timer_callback(void* arg) 
 {
     CircularBuffer_t *circularBuffer = (CircularBuffer_t *)arg;
-    static int countdown = 0;
-    
+    static int countdown = 0;    
     if (countdown == 0) 
     {
         if (dequeue(circularBuffer, &countdown) == false) 
         {
-            //ESP_LOGE(TAG, "Buffer underflow\n");
-            esp_timer_stop(timer);
+            printf("\n");
+            ESP_LOGE(TAG, "Buffer underflow\n");
+            esp_timer_stop(Timer);
         } 
         else
         {
+            printf("\n");
             ESP_LOGI(TAG, "new value dequeued %d", countdown);
+            countdown++;    // to compensate first countdown-- in the else block
         }
     }
     else
@@ -141,13 +144,14 @@ void serialTask(void *param)
                                           .arg = circularBuffer,
                                           .name = "timer_task"
                                          };
-    esp_timer_create(&timer_args, &timer);
+    esp_timer_create(&timer_args, &Timer);
     
     while (1) 
     {
-        if (uart_read_bytes(ECHO_UART_PORT_NUM, buffer, sizeof(buffer), pdMS_TO_TICKS(200)) > 0) 
+        if (uart_read_bytes(ECHO_UART_PORT_NUM, buffer, sizeof(buffer), pdMS_TO_TICKS(10)) > 0) 
         {
             num = atoi(buffer);
+            printf("\n");
             ESP_LOGI(TAG, "Received %d", num);
             if (num == 0) 
             {
@@ -156,8 +160,11 @@ void serialTask(void *param)
             else if (num > 0) 
             {
                 enqueue(circularBuffer, num);
-                // Start timer with 1 second period
-                esp_timer_start_periodic(timer, 1000000); // 1 second in microseconds
+                // Start timer with 1 second period if not already started
+                if (esp_timer_is_active(Timer) == false)
+                {
+                    esp_timer_start_periodic(Timer, 1000000); // 1 second in microseconds
+                }
             }
         }
     }
@@ -165,7 +172,7 @@ void serialTask(void *param)
 
 void app_main() 
 {
-    CircularBuffer_t *CircularBuffer = createCircularBuffer();
+    CircularBuffer_t *CircularBuffer = createCircularBuffer(8);
 
     // Initialize UART
     UART_config();
