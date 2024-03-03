@@ -14,21 +14,13 @@
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "CircularBuffer.h"
 
 #define STACK_SIZE 2048
 
-
-/**
- * This is an example which echos any data it receives on configured UART back to the sender,
- * with hardware flow control turned off. It does not use UART driver event queue.
- *
- * - Port: configured UART
- * - Receive (Rx) buffer: on
- * - Transmit (Tx) buffer: off
- * - Flow control: off
- * - Event queue: off
- * - Pin assignment: see defines below (See Kconfig)
- */
+#define FOO_TASK_CORE 0
+#define BAR_TASK_CORE 0
+#define PRIME_TASK_CORE 0
 
 #define ECHO_TEST_TXD (CONFIG_EXAMPLE_UART_TXD)
 #define ECHO_TEST_RXD (CONFIG_EXAMPLE_UART_RXD)
@@ -40,11 +32,11 @@
 #define ECHO_TASK_STACK_SIZE    (CONFIG_EXAMPLE_TASK_STACK_SIZE)
 
 static const char *TAG = "FizzBuzz";
-
 #define BUF_SIZE (1024)
-#define FOO_TASK_CORE 0
-#define BAR_TASK_CORE 0
-#define PRIME_TASK_CORE 0
+
+// Timer handle
+static esp_timer_handle_t timer;
+
 
 void EvenFooTask(void *pvParameters) 
 {
@@ -97,29 +89,42 @@ bool isPrime(int number) {
     return true;
 }
 
+// Timer callback function
 void timer_callback(void* arg) 
 {
+    CircularBuffer_t *circularBuffer = (CircularBuffer_t *)arg;
     static int countdown = 0;
     
     if (countdown == 0) 
     {
-        countdown = 100;
+        if (dequeue(circularBuffer, &countdown) == false) 
+        {
+            //ESP_LOGE(TAG, "Buffer underflow\n");
+            esp_timer_stop(timer);
+        } 
+        else
+        {
+            ESP_LOGI(TAG, "new value dequeued %d", countdown);
+        }
     }
-    countdown--;
-
-    switch (countdown % 2) 
+    else
     {
-        case 0:
-            xTaskCreatePinnedToCore(EvenFooTask, "EvenFooTask", 4096, &countdown, 1, NULL, FOO_TASK_CORE);
-            break;
-        case 1:
-            xTaskCreatePinnedToCore(OddBarTask, "OddBarTask", 4096, &countdown, 1, NULL, BAR_TASK_CORE);
-            break;
-    }
+        countdown--;
 
-    if (isPrime(countdown) == true) 
-    {
-        xTaskCreatePinnedToCore(PrimeTask, "PrimeTask", 4096, NULL, 1, NULL, PRIME_TASK_CORE);
+        switch (countdown % 2) 
+        {
+            case 0:
+                xTaskCreatePinnedToCore(EvenFooTask, "EvenFooTask", 4096, &countdown, 1, NULL, FOO_TASK_CORE);
+                break;
+            case 1:
+                xTaskCreatePinnedToCore(OddBarTask, "OddBarTask", 4096, &countdown, 1, NULL, BAR_TASK_CORE);
+                break;
+        }
+
+        if (isPrime(countdown) == true) 
+        {
+            xTaskCreatePinnedToCore(PrimeTask, "PrimeTask", 4096, NULL, 1, NULL, PRIME_TASK_CORE);
+        }
     }
     
                
@@ -127,15 +132,15 @@ void timer_callback(void* arg)
 
 void serialTask(void *param) 
 {
+    CircularBuffer_t *circularBuffer = (CircularBuffer_t *)param;
     char buffer[16];
     int num = 0;
 
     // Create a timer 
     esp_timer_create_args_t timer_args = {.callback = timer_callback,
-                                          NULL,
+                                          .arg = circularBuffer,
                                           .name = "timer_task"
                                          };
-    static esp_timer_handle_t timer;
     esp_timer_create(&timer_args, &timer);
     
     while (1) 
@@ -150,6 +155,7 @@ void serialTask(void *param)
             } 
             else if (num > 0) 
             {
+                enqueue(circularBuffer, num);
                 // Start timer with 1 second period
                 esp_timer_start_periodic(timer, 1000000); // 1 second in microseconds
             }
@@ -159,13 +165,16 @@ void serialTask(void *param)
 
 void app_main() 
 {
+    CircularBuffer_t *CircularBuffer = createCircularBuffer();
+
     // Initialize UART
     UART_config();
 
     // Create tasks
-    xTaskCreate(serialTask, "SerialTask", STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(serialTask, "SerialTask", STACK_SIZE, CircularBuffer, 1, NULL);
 
     while(1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
+
