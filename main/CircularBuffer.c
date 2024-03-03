@@ -2,12 +2,14 @@
 #include "esp_log.h"
 
 static const char *TAG = "CBUFFER";
+#define BUFFER_SIZE 8
+
  
 /**
  * @brief Creates a new CircularBuffer_t object.
  * @return A pointer to the newly created CircularBuffer_t object.
  */
-CircularBuffer_t* createCircularBuffer(uint8_t size) 
+CircularBuffer_t* createCircularBuffer() 
 {
     CircularBuffer_t *buffer = (CircularBuffer_t*)malloc(sizeof(CircularBuffer_t));
     if (buffer == NULL) {
@@ -15,7 +17,7 @@ CircularBuffer_t* createCircularBuffer(uint8_t size)
         exit(EXIT_FAILURE);
     }
 
-    buffer->data = (int*)malloc(size * sizeof(uint8_t));
+    buffer->data = (int*)malloc((BUFFER_SIZE - 1) * sizeof(int));
     if (buffer->data == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         exit(EXIT_FAILURE);
@@ -43,9 +45,9 @@ void destroyCircularBuffer(CircularBuffer_t *buffer) {
  * @param value The value to be added to the buffer.
  */
 void enqueue(CircularBuffer_t *buffer, int value) {
-    if (buffer->size == BUFFER_SIZE) 
+    if (buffer->size == BUFFER_SIZE - 1) 
     {
-        ESP_LOGD(TAG, "Buffer is currently full\n");
+        ESP_LOGE(TAG, "Can not enqueue, Buffer is currently full\n");
         return;
     }
 

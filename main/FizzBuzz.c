@@ -157,6 +157,10 @@ void serialTask(void *param)
             {
                 esp_restart();
             } 
+            else if (num < 0) 
+            {
+                ESP_LOGE(TAG, "Negative numbers are not allowed");
+            }
             else if (num > 0) 
             {
                 enqueue(circularBuffer, num);
@@ -172,7 +176,7 @@ void serialTask(void *param)
 
 void app_main() 
 {
-    CircularBuffer_t *CircularBuffer = createCircularBuffer(8);
+    CircularBuffer_t *CircularBuffer = createCircularBuffer();
 
     // Initialize UART
     UART_config();

@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define BUFFER_SIZE 8
 
 typedef struct {
     int *data;
@@ -19,7 +18,7 @@ typedef struct {
  * @return a pointer to the new buffer
  * @param size the size of the buffer
  */
-CircularBuffer_t* createCircularBuffer(uint8_t size);
+CircularBuffer_t* createCircularBuffer();
 
 /**
  * Destroy a circular buffer
