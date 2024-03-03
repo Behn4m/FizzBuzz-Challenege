@@ -42,6 +42,29 @@
 static const char *TAG = "FizzBuzz";
 
 #define BUF_SIZE (1024)
+#define FOO_TASK_CORE 0
+#define BAR_TASK_CORE 0
+#define PRIME_TASK_CORE 0
+
+void EvenFooTask(void *pvParameters) 
+{
+    int *num = (int *)pvParameters;
+    printf("\nFoo %d", *num);
+    vTaskDelete(NULL);
+}
+
+void OddBarTask(void *pvParameters) 
+{
+    int *num = (int *)pvParameters;
+    printf("\nBar %d", *num);
+    vTaskDelete(NULL);
+}
+
+void PrimeTask() 
+{
+    printf(" Prime");
+    vTaskDelete(NULL);
+}
 
 static void UART_config()
 {
@@ -82,24 +105,23 @@ void timer_callback(void* arg)
     {
         countdown = 100;
     }
-    else 
-    {
-        switch (countdown % 2) 
-        {
-            case 0:
-                printf("Fizz\n");
-                break;
-            case 1:
-                printf("Buzz\n");
-                break;
-        }
-
-        if (isPrime(countdown) == true) 
-        {
-            printf("Prime\n");
-        }
-    }
     countdown--;
+
+    switch (countdown % 2) 
+    {
+        case 0:
+            xTaskCreatePinnedToCore(EvenFooTask, "EvenFooTask", 4096, &countdown, 1, NULL, FOO_TASK_CORE);
+            break;
+        case 1:
+            xTaskCreatePinnedToCore(OddBarTask, "OddBarTask", 4096, &countdown, 1, NULL, BAR_TASK_CORE);
+            break;
+    }
+
+    if (isPrime(countdown) == true) 
+    {
+        xTaskCreatePinnedToCore(PrimeTask, "PrimeTask", 4096, NULL, 1, NULL, PRIME_TASK_CORE);
+    }
+    
                
 }
 
