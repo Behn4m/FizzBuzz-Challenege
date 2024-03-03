@@ -13,6 +13,10 @@
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+
+#define STACK_SIZE 2048
+
 
 /**
  * This is an example which echos any data it receives on configured UART back to the sender,
@@ -57,11 +61,87 @@ static void UART_config()
     ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
 }
 
+// Function to check if a number is prime
+bool isPrime(int number) {
+    if (number <= 1) {
+        return false;
+    }
+    for (int i = 2; i * i <= number; i++) {
+        if (number % i == 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void timer_callback(void* arg) 
+{
+    static int countdown = 0;
+    
+    if (countdown == 0) 
+    {
+        countdown = 100;
+    }
+    else 
+    {
+        switch (countdown % 2) 
+        {
+            case 0:
+                printf("Fizz\n");
+                break;
+            case 1:
+                printf("Buzz\n");
+                break;
+        }
+
+        if (isPrime(countdown) == true) 
+        {
+            printf("Prime\n");
+        }
+    }
+    countdown--;
+               
+}
+
+void serialTask(void *param) 
+{
+    char buffer[16];
+    int num = 0;
+
+    // Create a timer 
+    esp_timer_create_args_t timer_args = {.callback = timer_callback,
+                                          NULL,
+                                          .name = "timer_task"
+                                         };
+    static esp_timer_handle_t timer;
+    esp_timer_create(&timer_args, &timer);
+    
+    while (1) 
+    {
+        if (uart_read_bytes(ECHO_UART_PORT_NUM, buffer, sizeof(buffer), pdMS_TO_TICKS(200)) > 0) 
+        {
+            num = atoi(buffer);
+            ESP_LOGI(TAG, "Received %d", num);
+            if (num == 0) 
+            {
+                esp_restart();
+            } 
+            else if (num > 0) 
+            {
+                // Start timer with 1 second period
+                esp_timer_start_periodic(timer, 1000000); // 1 second in microseconds
+            }
+        }
+    }
+}
 
 void app_main() 
 {
     // Initialize UART
     UART_config();
+
+    // Create tasks
+    xTaskCreate(serialTask, "SerialTask", STACK_SIZE, NULL, 1, NULL);
 
     while(1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
